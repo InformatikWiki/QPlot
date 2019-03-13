@@ -16,6 +16,7 @@ public:
 
 protected:
     void timerEvent(QTimerEvent *event);
+    void wheelEvent(QWheelEvent *event);
 
 private:
     int timerId;
@@ -23,7 +24,9 @@ private:
     std::vector<QPlot*> plots;
 
     QPointF newSinPoint(int);
-    QPlot* createPlot(void);
+    QPlot* createBoolPlot(void);
+    QPlot* createIntegerPlot(void);
+    QPlot* createDoublePlot(void);
 };
 
 #endif // MAINWINDOW_H

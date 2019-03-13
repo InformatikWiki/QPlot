@@ -1,72 +1,174 @@
 #include "QPlot.h"
 #include <QMouseEvent>
+#include <QDateTimeAxis>
 #include <QValueAxis>
 #include <QLineSeries>
+#include <QDebug>
 
-QPlot::QPlot(QChart *chart, QWidget *parent) :
-    QChartView(chart, parent)
+QDateTime QPlot::allMinTime = QDateTime::currentDateTime();
+QDateTime QPlot::allMaxTime = QDateTime::currentDateTime();
+QPlot* QPlot::currentZoomPlot = nullptr;
+QDateTime QPlot::currentZoomMinTime = QDateTime::currentDateTime();
+QDateTime QPlot::currentZoomMaxTime = QDateTime::currentDateTime();
+
+QPlot::QPlot(std::string title, Type type, QWidget *parent) :
+    QChartView(new QChart(), parent),
+    title(title),
+    type(type),
+    lastMouseXPos(0.0),
+    counter(0),
+    timerId(startTimer(1000))
 {
-    lastMouseXPos = 0.0;
-    timerId = startTimer(1000);
+    QLineSeries *series = new QLineSeries();
+    chart()->addSeries(series);
+    chart()->setTitle(title.c_str());
+    //chart()->setAnimationOptions(QChart::SeriesAnimations);
+    chart()->legend()->hide();
+    //chart()->createDefaultAxes();
 
-    QLineSeries* m_series = dynamic_cast<QLineSeries*>(chart->series().at(0));
+    QDateTimeAxis *axisX = new QDateTimeAxis;
+    axisX->setTickCount(10);
+    axisX->setFormat("hh:mm:ss.zzz");
+    QDateTime now = QDateTime::currentDateTime();
+    minTime = now;
+    //axisX->setTitleText("Date");
+    chart()->addAxis(axisX, Qt::AlignBottom);
+    chart()->axisX()->setMin(minTime);
+    series->attachAxis(axisX);
 
-    connect(m_series, &QLineSeries::pointAdded, [=](int index){
-        qreal y = m_series->at(index).y();
-        qreal x = m_series->at(index).x();
+    QValueAxis *axisY = new QValueAxis;
+    axisY->setLabelFormat("%.0f");
+    axisY->applyNiceNumbers();
 
-        qreal yMax = ((QValueAxis*)chart->axisY())->max();
-        qreal yMin = ((QValueAxis*)chart->axisY())->min();
-        if ( (y < yMin) || (y > yMax) )
+    if (type == Type::BOOL)
+    {
+        axisY->setTickCount(2);
+    }
+    //axisY->setTitleText("Sunspots count");
+    chart()->addAxis(axisY, Qt::AlignLeft);
+    series->attachAxis(axisY);
+
+    connect(series, &QLineSeries::pointAdded, [=](int index)
+    {
+        if (QValueAxis* axis = dynamic_cast<QValueAxis*>(chart()->axisY()))
         {
-            if (y < yMin)
-                yMin = y;
-            if (y > yMax)
-                yMax = y;
-            chart->axisY()->setRange(yMin, yMax);
+            qreal y = series->at(index).y();
+            qreal yMax = axis->max();
+            qreal yMin = axis->min();
+            if ( (y < yMin) || (y > yMax) )
+            {
+                if (y < yMin)
+                    yMin = y;
+                if (y > yMax)
+                    yMax = y;
+                axis->setRange(yMin, yMax);
+            }
         }
-
-        qreal xMax = ((QValueAxis*)chart->axisX())->max();
-        qreal xMin = ((QValueAxis*)chart->axisX())->min();
-        if ( (x < xMin) || (x > xMax) )
-        {
-            if (x < xMin)
-                xMin = x;
-            if (x > xMax)
-                xMax = x;
-            chart->axisX()->setRange(xMin, xMax);
-        }
-
     });
+}
+
+void QPlot::append(bool value)
+{
+    if (type == BOOL)
+    {
+        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
+        {
+            maxTime = QDateTime::currentDateTime();
+            updateAllMinMaxTime();
+
+            chart()->axisX()->setMax(maxTime);
+            qreal xValue = maxTime.toMSecsSinceEpoch();
+            if (series->points().count() > 0)
+            {
+                QPointF last = series->points().last();
+                bool lastBool = false;
+                if (last.y() > 0.5)
+                {
+                    lastBool = true;
+                }
+                if (value != lastBool)
+                {
+                    series->append(QPointF(xValue, (lastBool ? 1.0 : 0.0)));
+                }
+            }
+            series->append(QPointF(xValue, (value ? 1.0 : 0.0)));
+        }
+    }
+}
+
+void QPlot::append(int value)
+{
+    if (type == INTEGER)
+    {
+        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
+        {
+            maxTime = QDateTime::currentDateTime();
+            updateAllMinMaxTime();
+
+            chart()->axisX()->setMax(maxTime);
+            qreal xValue = maxTime.toMSecsSinceEpoch();
+            if (series->points().count() > 0)
+            {
+                QPointF last = series->points().last();
+                series->append(QPointF(xValue, last.y()));
+            }
+            series->append(QPointF(xValue, (qreal)value));
+        }
+    }
+}
+
+void QPlot::append(double value)
+{
+    if (type == DOUBLE)
+    {
+        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
+        {
+            maxTime = QDateTime::currentDateTime();
+            updateAllMinMaxTime();
+
+            chart()->axisX()->setMax(maxTime);
+            qreal xValue = maxTime.toMSecsSinceEpoch();
+            series->append(xValue, (qreal)value);
+        }
+    }
+}
+
+void QPlot::updateAllMinMaxTime(void)
+{
+    if (minTime < allMinTime)
+        allMinTime = minTime;
+
+    if (maxTime > allMaxTime)
+        allMaxTime = maxTime;
 }
 
 void QPlot::timerEvent(QTimerEvent*)
 {
-    if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
+    if ((currentZoomMinTime < allMinTime) || (allMaxTime < currentZoomMaxTime))
     {
-        if (series->points().count() > 0)
+        currentZoomPlot = nullptr;
+    }
+
+    if (currentZoomPlot == nullptr)
+    {
+        currentZoomMinTime = allMinTime;
+        currentZoomMaxTime = allMaxTime;
+    }
+    if (currentZoomPlot == this)
+    {
+        if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(chart()->axisX()))
         {
-            qreal xMin = series->points().at(0).x();
-            qreal xMax = series->points().at(0).x();
-
-            QList<QPointF> points = series->points();
-            QList<QPointF>::iterator it;
-            for (it = points.begin(); it != points.end(); ++it)
-            {
-                if ((*it).x() < xMin)
-                    xMin = (*it).x();
-                if ((*it).x() > xMax)
-                    xMax = (*it).x();
-            }
-
-            if (QValueAxis* axis = dynamic_cast<QValueAxis*>(chart()->axisX()))
-            {
-                if ( (axis->min() < xMin) || (axis->max() > xMax) )
-                {
-                    chart()->zoomReset();
-                    chart()->axisX()->setRange(xMin, xMax);
-                }
-            }
+            currentZoomMinTime = axis->min();
+            currentZoomMaxTime = axis->max();
+        }
+    }
+    else
+    {
+        if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(chart()->axisX()))
+        {
+            chart()->zoomReset();
+            axis->setMin(currentZoomMinTime);
+            axis->setMax(currentZoomMaxTime);
         }
     }
 }
@@ -79,6 +181,7 @@ void QPlot::mouseMoveEvent(QMouseEvent *event)
 
 void QPlot::wheelEvent(QWheelEvent *event)
 {
+    currentZoomPlot = this;
     qreal factor=1.0;
     factor *= event->angleDelta().y() > 0 ? 0.5 : 2;
     zoomW(factor, lastMouseXPos);
