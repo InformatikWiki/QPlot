@@ -21,12 +21,14 @@ protected:
 private:
     int timerId;
     int counter;
-    std::vector<QPlot*> plots;
+    QPlot<bool>* boolPlot;
+    QPlot<int>* intPlot;
+    QPlot<double>* doublePlot;
 
     QPointF newSinPoint(int);
-    QPlot* createBoolPlot(void);
-    QPlot* createIntegerPlot(void);
-    QPlot* createDoublePlot(void);
+    QPlot<bool>* createBoolPlot(void);
+    QPlot<int>* createIntegerPlot(void);
+    QPlot<double>* createDoublePlot(void);
 };
 
 #endif // MAINWINDOW_H

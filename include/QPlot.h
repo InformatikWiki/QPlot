@@ -2,41 +2,30 @@
 #define QPLOT_H
 
 #include <QChartView>
-#include <QTimer>
 #include <QDateTime>
 
 QT_CHARTS_USE_NAMESPACE
 
+template<class T>
 class QPlot : public QChartView
 {
-    Q_OBJECT
-
 public:
-    typedef enum {
-        BOOL,
-        INTEGER,
-        DOUBLE
-    } Type;
+    QPlot(std::string title, QWidget *parent = 0);
 
-    QPlot(std::string title, Type type, QWidget *parent = 0);
-
-    void append(bool);
-    void append(int);
-    void append(double);
+    void append(T);
 
 protected:
+    void initAxis(void);
+    qreal updateTime(void);
     void updateAllMinMaxTime(void);
     void mouseMoveEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
-    void timerEvent(QTimerEvent *event);
 
 private:
     std::string title;
-    Type type;
     qreal lastMouseXPos;
     int counter;
-    int timerId;
     QDateTime minTime;
     QDateTime maxTime;
 

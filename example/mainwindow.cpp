@@ -24,18 +24,16 @@ MainWindow::MainWindow(QWidget *parent)
     widget->setLayout(layout);
     setCentralWidget(widget);
 
-    auto plot = createBoolPlot();
-    plots.push_back(plot);
-    layout->addWidget(plot);
+    boolPlot = createBoolPlot();
+    layout->addWidget(boolPlot);
 
-    plot = createIntegerPlot();
-    plots.push_back(plot);
-    layout->addWidget(plot);
+    intPlot = createIntegerPlot();
+    layout->addWidget(intPlot);
 
-    plot = createDoublePlot();
-    plots.push_back(plot);
-    layout->addWidget(plot);
+    doublePlot = createDoublePlot();
+    layout->addWidget(doublePlot);
 
+    counter = 100;
     timerId = startTimer(100);
 
     resize(600, 500);
@@ -52,9 +50,9 @@ QPointF MainWindow::newSinPoint(int c)
     return QPointF((qreal)c, qSin(M_PI / 50 * c) * 100);
 }
 
-QPlot* MainWindow::createBoolPlot(void)
+QPlot<bool>* MainWindow::createBoolPlot(void)
 {
-    QPlot *plot = new QPlot("BOOL Plot", QPlot::Type::BOOL);
+    QPlot<bool>* plot = new QPlot<bool>("BOOL Plot");
     plot->setRenderHint(QPainter::Antialiasing);
     bool val = false;
     for (counter = 0; counter < 500; counter++)
@@ -67,9 +65,9 @@ QPlot* MainWindow::createBoolPlot(void)
     return plot;
 }
 
-QPlot* MainWindow::createIntegerPlot(void)
+QPlot<int>* MainWindow::createIntegerPlot(void)
 {
-    QPlot *plot = new QPlot("INTEGER Plot", QPlot::Type::INTEGER);
+    QPlot<int>* plot = new QPlot<int>("INTEGER Plot");
     plot->setRenderHint(QPainter::Antialiasing);
     counter = 0;
     while (counter < 200)
@@ -81,9 +79,9 @@ QPlot* MainWindow::createIntegerPlot(void)
     return plot;
 }
 
-QPlot* MainWindow::createDoublePlot(void)
+QPlot<double>* MainWindow::createDoublePlot(void)
 {
-    QPlot *plot = new QPlot("DOUBLE Plot", QPlot::Type::DOUBLE);
+    QPlot<double>* plot = new QPlot<double>("DOUBLE Plot");
     plot->setRenderHint(QPainter::Antialiasing);
 
     for (counter = 0; counter < 500; counter++)
@@ -96,11 +94,11 @@ QPlot* MainWindow::createDoublePlot(void)
 
 void MainWindow::timerEvent(QTimerEvent*)
 {
-    if (counter < 600)
+    if (counter < 100)
     {
         qDebug() << "QPlot Update...";
 
-        plots.at(2)->append(qSin(M_PI / 50 * counter++) * 150);
+        doublePlot->append(qSin(M_PI / 50 * counter++) * 150);
     }
 }
 
