@@ -22,13 +22,9 @@ MainWindow::MainWindow(QWidget *parent)
     intView = plot->addView("int plot", QPlotView::Type::INTEGER);
     intView->append(0);
 
-    // Create and init double view 1
-    doubleView1 = plot->addView("double plot", QPlotView::Type::DOUBLE);
-    doubleView1->append(0.0);
-
-    // Create and init double view 2
-    doubleView2 = plot->addView("double plot", QPlotView::Type::DOUBLE);
-    doubleView2->append(0.0);
+    // Create and init double view
+    doubleView = plot->addView("double plot", QPlotView::Type::DOUBLE);
+    doubleView->append(0.0);
 
     // Create and init custom view
     std::vector<std::string> custom;
@@ -56,17 +52,10 @@ MainWindow::MainWindow(QWidget *parent)
         QThread::msleep(sampleDelayMs);
     }
 
-    // Fill double view 1
+    // Fill double view
     for (counter = 0; counter < 500; counter++)
     {
-        doubleView1->append(qSin(M_PI / 50 * counter) * 100);
-        QThread::msleep(sampleDelayMs);
-    }
-
-    // Fill double view 2
-    for (counter = 0; counter < 300; counter++)
-    {
-        doubleView2->append(qSin(M_PI / 50 * counter) * 100);
+        doubleView->append(qSin(M_PI / 50 * counter) * 100);
         QThread::msleep(sampleDelayMs);
     }
 
@@ -95,8 +84,7 @@ void MainWindow::timerEvent(QTimerEvent*)
     {
         boolView->append(counter % 4 == 0 ? true : false);
         intView->append(counter);
-        doubleView1->append(qSin(M_PI / 50 * counter) * 150);
-        doubleView2->append(qSin(M_PI / 50 * counter) * 150);
+        doubleView->append(qSin(M_PI / 50 * counter) * 150);
         customView->append(counter%4);
         counter++;
     }

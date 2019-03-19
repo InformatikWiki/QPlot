@@ -4,6 +4,9 @@
 #include <QCheckBox>
 #include <QDebug>
 #include <QDateTimeAxis>
+#include <QLineSeries>
+#include <QFileDialog>
+#include <QMessageBox>
 
 QPlot::QPlot() :
     layout(new QBoxLayout(QBoxLayout::Direction::TopToBottom, this)),
@@ -57,7 +60,50 @@ QPlot::QPlot() :
     controlLayout->addWidget(exportButton);
     connect(exportButton, &QPushButton::clicked, [=]()
     {
-        qDebug() << "Export .csv TODO";
+        QString fileName = QFileDialog::getSaveFileName(this,
+                tr("Export .csv"), "",
+                tr("Comma-separated values (*.csv);;"));
+
+        QFile file(fileName);
+        if (!file.open(QIODevice::WriteOnly)) {
+            QMessageBox::information(this, tr("Unable to open file"),
+                file.errorString());
+            return;
+        }
+
+        for (QPlotView* plot : plotViews)
+        {
+            file.write(plot->getTitle().c_str(), plot->getTitle().size());
+
+            if (QLineSeries* series = dynamic_cast<QLineSeries*>(plot->chart()->series().at(0)))
+            {
+                std::string temp = "\n";
+                std::string rawVal = "";
+                double val;
+                for (QPointF point : series->points())
+                {
+                    val = point.y();
+                    rawVal = std::to_string(val);
+                    std::replace(rawVal.begin(), rawVal.end(), '.', ',');
+                    temp += rawVal + ";";
+                }
+                temp += "\n";
+                file.write(temp.c_str(), temp.size());
+                file.flush();
+                QDateTime dateTime;
+                temp = "";
+                for (QPointF point : series->points())
+                {
+                    val = point.x();
+                    dateTime = QDateTime::fromMSecsSinceEpoch(val);
+
+                    temp += dateTime.toString("hh:mm:ss.zzz").toStdString() + ";";
+                }
+                temp += "\n\n";
+                file.write(temp.c_str(), temp.size());
+                file.flush();
+            }
+        }
     });
 
     layout->addWidget(controlGroupBox);
@@ -66,9 +112,9 @@ QPlot::QPlot() :
     layout->addWidget(plotsGroupBox);
 }
 
-QPlotView *QPlot::addView(std::string title, QPlotView::Type type, std::vector<std::string>* custom)
+QPlotView* QPlot::addView(std::string title, QPlotView::Type type, std::vector<std::string>* custom)
 {
-    QPlotView *plot = nullptr;
+    QPlotView* plot = nullptr;
     switch (type)
     {
         case QPlotView::Type::BOOL:

@@ -21,6 +21,7 @@ public:
     } Type;
 
     QPlotView(std::string title, Type type, QPlotView*& currentZoomPlot, bool updateOnAppend = true, std::vector<std::string>* custom = nullptr, QWidget *parent = 0);
+    std::string getTitle(void);
 
     void append(bool);
     void append(int);

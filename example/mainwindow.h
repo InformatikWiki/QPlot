@@ -22,8 +22,7 @@ private:
     QPlot* plot;
     QPlotView* boolView;
     QPlotView* intView;
-    QPlotView* doubleView1;
-    QPlotView* doubleView2;
+    QPlotView* doubleView;
     QPlotView* customView;
     int counter;
 };

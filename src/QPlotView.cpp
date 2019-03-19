@@ -89,6 +89,11 @@ QPlotView::QPlotView(std::string title, Type type, QPlotView*& currentZoomPlot, 
     connect(this, SIGNAL(signal_append(QDateTime, double)), this, SLOT(slot_append(QDateTime, double)));
 }
 
+std::string QPlotView::getTitle(void)
+{
+    return title;
+}
+
 QDateTime QPlotView::getMinTime(void)
 {
     return minTime;
