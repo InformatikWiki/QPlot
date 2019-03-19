@@ -16,17 +16,16 @@ public:
 
 protected:
     void timerEvent(QTimerEvent *event);
-    void wheelEvent(QWheelEvent *event);
 
 private:
     int timerId;
+    QPlot* plot;
+    QPlotView* boolView;
+    QPlotView* intView;
+    QPlotView* doubleView1;
+    QPlotView* doubleView2;
+    QPlotView* customView;
     int counter;
-    std::vector<QPlot*> plots;
-
-    QPointF newSinPoint(int);
-    QPlot* createBoolPlot(void);
-    QPlot* createIntegerPlot(void);
-    QPlot* createDoublePlot(void);
 };
 
 #endif // MAINWINDOW_H

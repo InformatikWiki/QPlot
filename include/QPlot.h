@@ -1,54 +1,38 @@
-#ifndef QPLOT_H
-#define QPLOT_H
+#ifndef QPLOTVIEW_H
+#define QPLOTVIEW_H
 
-#include <QChartView>
+#include <QWidget>
+#include <QBoxLayout>
 #include <QTimer>
 #include <QDateTime>
+#include <vector>
+#include "QPlotView.h"
 
-QT_CHARTS_USE_NAMESPACE
-
-class QPlot : public QChartView
+class QPlot : public QWidget
 {
     Q_OBJECT
 
 public:
-    typedef enum {
-        BOOL,
-        INTEGER,
-        DOUBLE
-    } Type;
+    QPlot();
 
-    QPlot(std::string title, Type type, QWidget *parent = 0);
-
-    void append(bool);
-    void append(int);
-    void append(double);
+    //template <typename T>
+    QPlotView* addView(std::string title, QPlotView::Type, std::vector<std::string>* custom = nullptr);
 
 protected:
-    void updateAllMinMaxTime(void);
-    void mouseMoveEvent(QMouseEvent *event);
-    void wheelEvent(QWheelEvent *event);
-    void keyPressEvent(QKeyEvent *event);
     void timerEvent(QTimerEvent *event);
 
 private:
-    std::string title;
-    Type type;
-    qreal lastMouseXPos;
-    int counter;
+    QBoxLayout* layout;
+    QBoxLayout* visibleLayout;
+    QBoxLayout* plotsLayout;
+    std::vector<QPlotView*> plotViews;
     int timerId;
-    QDateTime minTime;
-    QDateTime maxTime;
 
-    static QDateTime allMinTime;
-    static QDateTime allMaxTime;
-
-
-    static QPlot*    currentZoomPlot;
-    static QDateTime currentZoomMinTime;
-    static QDateTime currentZoomMaxTime;
-
-    void zoomW(qreal factor, qreal xPos);
+    QDateTime allMinTime;
+    QDateTime allMaxTime;
+    QDateTime currentZoomMinTime;
+    QDateTime currentZoomMaxTime;
+    QPlotView* currentZoomPlot;
 };
 
-#endif // QPLOT_H
+#endif // QPLOTVIEW_H

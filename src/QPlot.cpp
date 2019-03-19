@@ -1,236 +1,168 @@
 #include "QPlot.h"
-#include <QMouseEvent>
-#include <QDateTimeAxis>
-#include <QValueAxis>
-#include <QLineSeries>
+#include <QGroupBox>
+#include <QPushButton>
+#include <QCheckBox>
 #include <QDebug>
+#include <QDateTimeAxis>
 
-QDateTime QPlot::allMinTime = QDateTime::currentDateTime();
-QDateTime QPlot::allMaxTime = QDateTime::currentDateTime();
-QPlot* QPlot::currentZoomPlot = nullptr;
-QDateTime QPlot::currentZoomMinTime = QDateTime::currentDateTime();
-QDateTime QPlot::currentZoomMaxTime = QDateTime::currentDateTime();
-
-QPlot::QPlot(std::string title, Type type, QWidget *parent) :
-    QChartView(new QChart(), parent),
-    title(title),
-    type(type),
-    lastMouseXPos(0.0),
-    counter(0),
-    timerId(startTimer(1000))
+QPlot::QPlot() :
+    layout(new QBoxLayout(QBoxLayout::Direction::TopToBottom, this)),
+    timerId(startTimer(200)),
+    allMinTime(QDateTime::currentDateTime()),
+    allMaxTime(QDateTime::currentDateTime()),
+    currentZoomMinTime(QDateTime::currentDateTime()),
+    currentZoomMaxTime(QDateTime::currentDateTime()),
+    currentZoomPlot(nullptr)
 {
-    QLineSeries *series = new QLineSeries();
-    chart()->addSeries(series);
-    chart()->setTitle(title.c_str());
-    //chart()->setAnimationOptions(QChart::SeriesAnimations);
-    chart()->legend()->hide();
-    //chart()->createDefaultAxes();
+    QGroupBox *controlGroupBox = new QGroupBox(tr("Control"));
+    auto controlLayout = new QBoxLayout(QBoxLayout::Direction::LeftToRight, controlGroupBox);
 
-    QDateTimeAxis *axisX = new QDateTimeAxis;
-    axisX->setTickCount(10);
-    axisX->setFormat("hh:mm:ss.zzz");
-    QDateTime now = QDateTime::currentDateTime();
-    minTime = now;
-    //axisX->setTitleText("Date");
-    chart()->addAxis(axisX, Qt::AlignBottom);
-    chart()->axisX()->setMin(minTime);
-    series->attachAxis(axisX);
+    QGroupBox *visibleGroupBox = new QGroupBox(tr("Plots"));
+    visibleLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom, visibleGroupBox);
+    controlLayout->addWidget(visibleGroupBox);
 
-    QValueAxis *axisY = new QValueAxis;
-    axisY->setLabelFormat("%.0f");
-    axisY->applyNiceNumbers();
-
-    if (type == Type::BOOL)
+    auto recordCheckBox = new QCheckBox("Record");
+    recordCheckBox->setChecked(false);
+    controlLayout->addWidget(recordCheckBox);
+    connect(recordCheckBox, &QCheckBox::clicked, [=](bool value)
     {
-        axisY->setTickCount(2);
-    }
-    //axisY->setTitleText("Sunspots count");
-    chart()->addAxis(axisY, Qt::AlignLeft);
-    series->attachAxis(axisY);
-
-    connect(series, &QLineSeries::pointAdded, [=](int index)
-    {
-        if (QValueAxis* axis = dynamic_cast<QValueAxis*>(chart()->axisY()))
+        qDebug() << "Record " << (value ? "enabled" : "disabled");
+        for (auto plot : plotViews)
         {
-            qreal y = series->at(index).y();
-            qreal yMax = axis->max();
-            qreal yMin = axis->min();
-            if ( (y < yMin) || (y > yMax) )
-            {
-                if (y < yMin)
-                    yMin = y;
-                if (y > yMax)
-                    yMax = y;
-                axis->setRange(yMin, yMax);
-            }
+            plot->setRecordOnAppend(value);
         }
     });
-}
 
-void QPlot::append(bool value)
-{
-    if (type == BOOL)
+    auto UpdateRecordCheckBox = new QCheckBox("Show Record");
+    UpdateRecordCheckBox->setChecked(false);
+    controlLayout->addWidget(UpdateRecordCheckBox);
+    connect(UpdateRecordCheckBox, &QCheckBox::clicked, [=](bool value)
     {
-        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
+        qDebug() << "Update Record " << (value ? "enabled" : "disabled");
+        for (auto plot : plotViews)
         {
-            maxTime = QDateTime::currentDateTime();
-            updateAllMinMaxTime();
-
-            chart()->axisX()->setMax(maxTime);
-            qreal xValue = maxTime.toMSecsSinceEpoch();
-            if (series->points().count() > 0)
-            {
-                QPointF last = series->points().last();
-                bool lastBool = false;
-                if (last.y() > 0.5)
-                {
-                    lastBool = true;
-                }
-                if (value != lastBool)
-                {
-                    series->append(QPointF(xValue, (lastBool ? 1.0 : 0.0)));
-                }
-            }
-            series->append(QPointF(xValue, (value ? 1.0 : 0.0)));
+            plot->setUpdateOnAppend(value);
         }
-    }
-}
+    });
 
-void QPlot::append(int value)
-{
-    if (type == INTEGER)
+    auto unzoomButton = new QPushButton("Unzoom");
+    controlLayout->addWidget(unzoomButton);
+    connect(unzoomButton, &QPushButton::clicked, [=]()
     {
-        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
-        {
-            maxTime = QDateTime::currentDateTime();
-            updateAllMinMaxTime();
+        qDebug() << "Unzoom ...";
+        currentZoomPlot = nullptr;
+    });
 
-            chart()->axisX()->setMax(maxTime);
-            qreal xValue = maxTime.toMSecsSinceEpoch();
-            if (series->points().count() > 0)
-            {
-                QPointF last = series->points().last();
-                series->append(QPointF(xValue, last.y()));
-            }
-            series->append(QPointF(xValue, (qreal)value));
-        }
-    }
-}
-
-void QPlot::append(double value)
-{
-    if (type == DOUBLE)
+    auto exportButton = new QPushButton("Export .csv");
+    controlLayout->addWidget(exportButton);
+    connect(exportButton, &QPushButton::clicked, [=]()
     {
-        if (QLineSeries* series = dynamic_cast<QLineSeries*>(chart()->series().at(0)))
-        {
-            maxTime = QDateTime::currentDateTime();
-            updateAllMinMaxTime();
+        qDebug() << "Export .csv TODO";
+    });
 
-            chart()->axisX()->setMax(maxTime);
-            qreal xValue = maxTime.toMSecsSinceEpoch();
-            series->append(xValue, (qreal)value);
-        }
-    }
+    layout->addWidget(controlGroupBox);
+    QGroupBox *plotsGroupBox = new QGroupBox(tr("Plots"));
+    plotsLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom, plotsGroupBox);
+    layout->addWidget(plotsGroupBox);
 }
 
-void QPlot::updateAllMinMaxTime(void)
+QPlotView *QPlot::addView(std::string title, QPlotView::Type type, std::vector<std::string>* custom)
 {
-    if (minTime < allMinTime)
-        allMinTime = minTime;
-
-    if (maxTime > allMaxTime)
-        allMaxTime = maxTime;
+    QPlotView *plot = nullptr;
+    switch (type)
+    {
+        case QPlotView::Type::BOOL:
+        {
+            plot = new QPlotView(title, QPlotView::Type::BOOL, currentZoomPlot, false);
+            //plot->setRenderHint(QPainter::Antialiasing);
+            break;
+        }
+        case QPlotView::Type::INTEGER:
+        {
+            plot = new QPlotView(title, QPlotView::Type::INTEGER, currentZoomPlot, false);
+            //plot->setRenderHint(QPainter::Antialiasing);
+            break;
+        }
+        case QPlotView::Type::DOUBLE:
+        {
+            plot = new QPlotView(title, QPlotView::Type::DOUBLE, currentZoomPlot, false);
+            //plot->setRenderHint(QPainter::Antialiasing);
+            break;
+        }
+        case QPlotView::Type::CUSTOM_CATEGORY:
+        {
+            plot = new QPlotView(title, QPlotView::Type::CUSTOM_CATEGORY, currentZoomPlot, false, custom);
+            //plot->setRenderHint(QPainter::Antialiasing);
+            break;
+        }
+        default:
+        break;
+    }
+    if (plot != nullptr)
+    {
+        auto visibleCheckBox = new QCheckBox(title.c_str());
+        visibleCheckBox->setChecked(true);
+        visibleLayout->addWidget(visibleCheckBox);
+        connect(visibleCheckBox, &QCheckBox::clicked, [=](bool value)
+        {
+            qDebug() << "visibleCheckBox " << (value ? "enabled" : "disabled");
+            if (value)
+                plot->show();
+            else
+                plot->hide();
+        });
+        plotViews.push_back(plot);
+        plotsLayout->addWidget(plot);
+    }
+    return plot;
 }
 
 void QPlot::timerEvent(QTimerEvent*)
 {
+    //qDebug() << "timerEvent";
+
+    // Update all Min/Max
+    for (auto plot : plotViews)
+    {
+        if (plot->getMinTime() < allMinTime)
+            allMinTime = plot->getMinTime();
+
+        if (plot->getMaxTime() > allMaxTime)
+            allMaxTime = plot->getMaxTime();
+    }
+
+    // Reset zoom plot, if unzoom is beyond the limits
     if ((currentZoomMinTime < allMinTime) || (allMaxTime < currentZoomMaxTime))
     {
         currentZoomPlot = nullptr;
     }
-
+    // Make zoom invalid
     if (currentZoomPlot == nullptr)
     {
         currentZoomMinTime = allMinTime;
         currentZoomMaxTime = allMaxTime;
     }
-    if (currentZoomPlot == this)
+    // Get the zoom window of current zoom plot view
+    if (currentZoomPlot != nullptr)
     {
-        if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(chart()->axisX()))
+        if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(currentZoomPlot->chart()->axisX()))
         {
             currentZoomMinTime = axis->min();
             currentZoomMaxTime = axis->max();
         }
     }
-    else
+
+    // Update all other views with zoom window
+    for (auto plot : plotViews)
     {
-        if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(chart()->axisX()))
+        if ((currentZoomPlot != plot) && (plot->isVisible()))
         {
-            chart()->zoomReset();
-            axis->setMin(currentZoomMinTime);
-            axis->setMax(currentZoomMaxTime);
+            if (QDateTimeAxis* axis = dynamic_cast<QDateTimeAxis*>(plot->chart()->axisX()))
+            {
+                plot->chart()->zoomReset();
+                axis->setMin(currentZoomMinTime);
+                axis->setMax(currentZoomMaxTime);
+            }
         }
-    }
-}
-
-void QPlot::mouseMoveEvent(QMouseEvent *event)
-{
-    lastMouseXPos = event->localPos().x();
-    QChartView::mouseMoveEvent(event);
-}
-
-void QPlot::wheelEvent(QWheelEvent *event)
-{
-    currentZoomPlot = this;
-    qreal factor=1.0;
-    factor *= event->angleDelta().y() > 0 ? 0.5 : 2;
-    zoomW(factor, lastMouseXPos);
-}
-
-void QPlot::keyPressEvent(QKeyEvent *event)
-{
-    switch (event->key())
-    {
-        case Qt::Key_Plus:
-            zoomW(0.5, chart()->plotArea().center().x());
-            break;
-        case Qt::Key_Minus:
-            zoomW(2.0, chart()->plotArea().center().x());
-            break;
-        case Qt::Key_Left:
-            chart()->scroll(-10, 0);
-            break;
-        case Qt::Key_Right:
-            chart()->scroll(10, 0);
-            break;
-        case Qt::Key_Up:
-            chart()->scroll(0, 10);
-            break;
-        case Qt::Key_Down:
-            chart()->scroll(0, -10);
-            break;
-        default:
-            QGraphicsView::keyPressEvent(event);
-            break;
-    }
-}
-
-void QPlot::zoomW(qreal factor, qreal xPos)
-{
-    QRectF rect = chart()->plotArea();
-    rect.setWidth(factor * rect.width());
-
-    QRectF plotarea = chart()->plotArea();
-
-    if (factor < 1.0)
-    {
-        chart()->scroll((xPos - plotarea.left())*factor, 0);
-    }
-
-    chart()->zoomIn(rect);
-
-    if (factor > 1.0)
-    {
-        chart()->scroll((xPos - plotarea.left())*(-(1/factor)), 0);
     }
 }
